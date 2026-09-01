@@ -1,0 +1,11 @@
+.gradle/
+build/
+*.apk
+local.properties
+.idea/
+.docker-cache/
+app/src/test/resources/fixtures/
+*.hex
+
+.superpowers/
+docs/superpowers/
