@@ -20,7 +20,7 @@ android {
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1,versions/**}" }
 }
 dependencies {
-    implementation(platform("androidx.compose:compose-bom:2024.09.00"))
+    implementation(platform("androidx.compose:compose-bom:2026.08.00"))
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.activity:activity-compose:1.9.2")
