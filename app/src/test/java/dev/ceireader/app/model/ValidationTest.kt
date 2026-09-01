@@ -11,11 +11,11 @@ class ValidationTest {
         assertFalse(Validation.isValidCan("12345a"))
         assertFalse(Validation.isValidCan(""))
     }
-    @Test fun pin_must_be_four_to_twelve_digits() {
+    @Test fun pin_must_be_exactly_four_digits() {
         assertTrue(Validation.isValidPin("1234"))
-        assertTrue(Validation.isValidPin("123456"))
         assertFalse(Validation.isValidPin("123"))
-        assertFalse(Validation.isValidPin("1234567890123"))
-        assertFalse(Validation.isValidPin("12ab"))
+        assertFalse(Validation.isValidPin("12345"))
+        assertFalse(Validation.isValidPin("abcd"))
+        assertFalse(Validation.isValidPin(""))
     }
 }
