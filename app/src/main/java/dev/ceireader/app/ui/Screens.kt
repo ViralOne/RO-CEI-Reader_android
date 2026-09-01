@@ -71,6 +71,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.ceireader.app.BuildConfig
 import dev.ceireader.app.model.AddressPeriod
 import dev.ceireader.app.model.CeiData
 import dev.ceireader.app.model.NfcStatus
@@ -247,6 +248,15 @@ private fun IdleScreen(vm: ReadViewModel) {
                     }
                 }
             }
+
+            Spacer(Modifier.height(16.dp))
+
+            Text(
+                text = "v${BuildConfig.VERSION_NAME}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }
