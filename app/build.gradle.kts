@@ -17,7 +17,12 @@ android {
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlin { jvmToolchain(17) }
     buildFeatures { compose = true; buildConfig = true }
-    packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1,versions/**}" }
+    packaging {
+        resources.excludes += "/META-INF/{AL2.0,LGPL2.1,versions/**}"
+        // bcprov-jdk18on and bcutil-jdk18on both bundle their own META-INF/LICENSE.md;
+        // keep one copy instead of failing the merge on the duplicate.
+        resources.pickFirsts += "META-INF/LICENSE.md"
+    }
 }
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.09.00"))
@@ -30,7 +35,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("org.jmrtd:jmrtd:0.7.42")
     implementation("net.sf.scuba:scuba-sc-android:0.0.27")
-    implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
-    implementation("org.bouncycastle:bcutil-jdk18on:1.78.1")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.85")
+    implementation("org.bouncycastle:bcutil-jdk18on:1.85")
     testImplementation("junit:junit:4.13.2")
 }
