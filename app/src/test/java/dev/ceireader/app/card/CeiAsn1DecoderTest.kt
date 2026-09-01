@@ -167,6 +167,18 @@ class CeiAsn1DecoderTest {
         assertEquals(null, result.placeOfBirth)
     }
 
+    @Test fun decodePersonal_trims_trailing_whitespace_padding_from_field_values() {
+        // Some EFs pad fixed-width fields with trailing whitespace; the decoder must
+        // strip it so callers/UI never see it.
+        val ef = outerSequence(
+            primitive(0x80, "TESTFAM   "),
+            primitive(0x81, "  ANA-MARIA ")
+        )
+        val result = CeiAsn1Decoder.decodePersonal(ef)
+        assertEquals("TESTFAM", result.lastName)
+        assertEquals("ANA-MARIA", result.firstName)
+    }
+
     @Test fun decodePersonal_decodes_utf8_diacritics_in_lastName() {
         // Cross-checked against an independent Romanian-eID reader: the card stores octet
         // strings as UTF-8, not ASCII, so Romanian diacritics (S-comma, T-comma, a-breve,

@@ -78,8 +78,9 @@ object CeiAsn1Decoder {
         return fields
     }
 
+    /** EFs sometimes pad primitive string values with trailing whitespace; trim it before returning. */
     private fun ascii(bytes: ByteArray?): String? =
-        bytes?.toString(Charsets.UTF_8)
+        bytes?.toString(Charsets.UTF_8)?.trim()
 
     private val EIGHT_DIGITS = Regex("^\\d{8}$")
 
