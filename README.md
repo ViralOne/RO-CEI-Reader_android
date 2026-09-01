@@ -1,5 +1,8 @@
 # RO CEI Reader (Android)
 
+![CI](https://github.com/ViralOne/RO-CEI-Reader_android/actions/workflows/ci.yml/badge.svg)
+![Release](https://github.com/ViralOne/RO-CEI-Reader_android/actions/workflows/release.yml/badge.svg)
+
 An open-source Android app that reads the Romanian electronic ID card
 (*Cartea Electronică de Identitate*, CEI) over NFC and exports the holder's
 data as a PDF.
@@ -90,6 +93,15 @@ code.
   - `ui/` — Compose screens, theme, ViewModel.
 - `app/src/test/java/dev/ceireader/app/` — JVM unit tests (APDU, SW, decoder,
   validation, error mapping).
+
+## CI
+
+- **CI** (`.github/workflows/ci.yml`) — runs on every PR and push to `main`:
+  unit tests (`:app:testDebugUnitTest`, report uploaded as an artifact), then
+  `:app:assembleDebug` (debug APK uploaded as an artifact).
+- **Release** (`.github/workflows/release.yml`) — triggered by pushing a
+  `vX.Y.Z` tag on `main`. Builds a debug-signed APK and AAB and publishes them
+  on a GitHub Release.
 
 ## Contributing
 
