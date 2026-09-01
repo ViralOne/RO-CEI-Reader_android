@@ -445,6 +445,7 @@ private fun ResultScreen(data: CeiData, onReset: () -> Unit) {
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         }
                         context.startActivity(Intent.createChooser(sendIntent, "Exportă PDF"))
+                        snackbarHostState.showSnackbar("PDF pregătit pentru partajare.")
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
@@ -503,6 +504,10 @@ private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Un
 
 @Composable
 private fun InfoRow(label: String, value: String?) {
+    // A null/blank value means the EF didn't carry this field -- render nothing rather
+    // than a labeled row with a "—" placeholder.
+    if (value.isNullOrBlank()) return
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -515,7 +520,7 @@ private fun InfoRow(label: String, value: String?) {
             modifier = Modifier.widthIn(min = 130.dp),
         )
         Text(
-            text = value?.takeIf { it.isNotBlank() } ?: "—",
+            text = value,
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Medium,
         )
@@ -547,7 +552,7 @@ private fun ErrorScreen(kind: ReadErrorKind, retriesLeft: Int?, onRetry: () -> U
             if (retriesLeft != null) append(" — au mai rămas $retriesLeft încercări.")
         }
         ReadErrorKind.PIN_BLOCKED -> "PIN blocat. Cardul trebuie deblocat."
-        ReadErrorKind.CARD_LOST -> "Cardul s-a mișcat în timpul citirii. Reîncercați și țineți-l nemișcat."
+        ReadErrorKind.CARD_LOST -> "Cardul s-a mișcat în timpul citirii. Așezați cardul plat pe spatele telefonului și țineți-l nemișcat."
         ReadErrorKind.COMMUNICATION, ReadErrorKind.UNKNOWN -> "Eroare de comunicație. Reîncercați."
     }
 
