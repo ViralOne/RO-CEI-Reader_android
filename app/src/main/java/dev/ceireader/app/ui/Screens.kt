@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -62,7 +63,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -113,6 +116,7 @@ private fun IdleScreen(vm: ReadViewModel) {
     val pinValid = Validation.isValidPin(pin)
     val nfcStatus = vm.nfcStatus
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
 
     Scaffold { padding ->
         Column(
@@ -154,15 +158,17 @@ private fun IdleScreen(vm: ReadViewModel) {
                     OutlinedTextField(
                         value = can,
                         onValueChange = { new ->
-                            if (new.length <= 6 && new.all { it.isDigit() }) {
-                                can = new
-                                vm.can = new
-                            }
+                            val filtered = new.filter { it.isDigit() }.take(6)
+                            can = filtered
+                            vm.can = filtered
                         },
                         label = { Text("CAN") },
                         supportingText = { Text("Codul CAN (6 cifre) de pe fața cardului") },
                         singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Number,
+                            imeAction = ImeAction.Next,
+                        ),
                         modifier = Modifier.fillMaxWidth(),
                     )
 
@@ -171,16 +177,19 @@ private fun IdleScreen(vm: ReadViewModel) {
                     OutlinedTextField(
                         value = pin,
                         onValueChange = { new ->
-                            if (new.length <= 12 && new.all { it.isDigit() }) {
-                                pin = new
-                                vm.pin = new
-                            }
+                            val filtered = new.filter { it.isDigit() }.take(4)
+                            pin = filtered
+                            vm.pin = filtered
                         },
                         label = { Text("PIN") },
-                        supportingText = { Text("PIN-ul cardului") },
+                        supportingText = { Text("PIN-ul cardului din 4 cifre") },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.NumberPassword,
+                            imeAction = ImeAction.Done,
+                        ),
+                        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                         modifier = Modifier.fillMaxWidth(),
                     )
 
