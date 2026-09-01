@@ -67,7 +67,7 @@ jobs:
           mv app/build/outputs/bundle/debug/app-debug.aab "app/build/outputs/bundle/debug/RO-CEI-Reader-${TAG}-debug.aab"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: Release ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
