@@ -17,7 +17,14 @@ android {
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlin { jvmToolchain(17) }
     buildFeatures { compose = true; buildConfig = true }
-    packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1,versions/**}" }
+    packaging {
+        resources.excludes += "/META-INF/{AL2.0,LGPL2.1,versions/**}"
+        // jmrtd 0.8.8 pulls a newer BouncyCastle transitively than the explicit
+        // bcprov/bcutil pins below, so bcprov-jdk18on and bcutil-jdk18on end up
+        // resolved at different versions, each bundling its own (differing)
+        // META-INF/LICENSE.md. Keep one copy instead of failing the merge.
+        resources.pickFirsts += "META-INF/LICENSE.md"
+    }
 }
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.09.00"))
@@ -28,7 +35,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
-    implementation("org.jmrtd:jmrtd:0.7.42")
+    implementation("org.jmrtd:jmrtd:0.8.8")
     implementation("net.sf.scuba:scuba-sc-android:0.0.26")
     implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
     implementation("org.bouncycastle:bcutil-jdk18on:1.78.1")
