@@ -33,14 +33,35 @@ class PaceSession(private val isoDep: IsoDep) {
      * Connects to the card, reads EF.CardAccess to find the PACEInfo, runs
      * PACE with the given CAN, then selects the ICAO applet under the new
      * secure channel. Returns the opened [PassportService].
+     *
+     * [useExtendedLength] picks the transceive length used for the
+     * SM-wrapped applet-file-system reads that follow (i.e. the later DG2
+     * read): when true, [PassportService.EXTENDED_MAX_TRANCEIVE_LENGTH] plus
+     * a [maxBlockSize][computeMaxBlockSize] sized to the tag's own transceive
+     * limit, cutting the number of READ BINARY round trips; when false, the
+     * original [PassportService.NORMAL_MAX_TRANCEIVE_LENGTH] /
+     * [PassportService.DEFAULT_MAX_BLOCKSIZE] pair. This does NOT affect the
+     * PACE handshake itself -- [PassportService]'s 5-arg constructor always
+     * runs PACE at the normal 256-byte length internally regardless of what's
+     * passed here (verified against the resolved jmrtd-0.8.8 jar/source).
      */
-    fun open(can: String): PassportService {
+    fun open(can: String, useExtendedLength: Boolean): PassportService {
         val cardService = IsoDepCardService(isoDep)
         openedCardService = cardService
+        val maxTranceiveLength = if (useExtendedLength) {
+            PassportService.EXTENDED_MAX_TRANCEIVE_LENGTH
+        } else {
+            PassportService.NORMAL_MAX_TRANCEIVE_LENGTH
+        }
+        val maxBlockSize = if (useExtendedLength) {
+            computeMaxBlockSize(isoDep)
+        } else {
+            PassportService.DEFAULT_MAX_BLOCKSIZE
+        }
         val ps = PassportService(
             cardService,
-            PassportService.NORMAL_MAX_TRANCEIVE_LENGTH,
-            PassportService.DEFAULT_MAX_BLOCKSIZE,
+            maxTranceiveLength,
+            maxBlockSize,
             false,
             false,
         )
@@ -104,6 +125,34 @@ class PaceSession(private val isoDep: IsoDep) {
         } catch (_: Exception) {
             // Best-effort cleanup: a close failure must not mask/replace
             // whatever read result the caller is already handling.
+        }
+    }
+
+    companion object {
+        /**
+         * Headroom subtracted from [IsoDep.getMaxTransceiveLength] before using
+         * it as the extended-length READ BINARY block size: the response is
+         * secure-messaging wrapped (DO87 ciphertext TLV + DO99 status + DO8E
+         * MAC TLV, plus CBC padding), so the plaintext payload capacity is a
+         * bit smaller than the tag's raw transceive limit. Conservative rather
+         * than tight, since overshooting would fail the transceive outright.
+         */
+        private const val EXTENDED_SM_OVERHEAD_BYTES = 64
+
+        /**
+         * Largest READ BINARY block size safe to request when extended-length
+         * APDUs are in play: bounded above by both what the hardware/NFC stack
+         * can move in one [IsoDep] transceive and by
+         * [PassportService.EXTENDED_MAX_TRANCEIVE_LENGTH] (JMRTD's own ceiling),
+         * and never below the original [PassportService.DEFAULT_MAX_BLOCKSIZE]
+         * so this is always >= the pre-optimization behavior.
+         */
+        private fun computeMaxBlockSize(isoDep: IsoDep): Int {
+            val hardwareLimit = isoDep.maxTransceiveLength - EXTENDED_SM_OVERHEAD_BYTES
+            return hardwareLimit.coerceIn(
+                PassportService.DEFAULT_MAX_BLOCKSIZE,
+                PassportService.EXTENDED_MAX_TRANCEIVE_LENGTH,
+            )
         }
     }
 }
