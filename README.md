@@ -119,3 +119,6 @@ MIT — see [LICENSE](LICENSE).
 - [victorholo/romanian-cei-reader-web](https://github.com/victorholo/romanian-cei-reader-web)
   — independent contact-reader project that confirmed the applet AIDs, EFs,
   and PIN VERIFY format used by the card.
+- [Poppins](https://github.com/google/fonts/tree/main/ofl/poppins) by the
+  Poppins Project Authors — bundled under the SIL Open Font License 1.1 (see
+  `app/src/main/font-licenses/Poppins-OFL.txt`) and used for headings only.
