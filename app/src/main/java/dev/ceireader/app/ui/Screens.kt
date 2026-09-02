@@ -49,6 +49,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -112,6 +113,7 @@ fun CeiApp(vm: ReadViewModel) {
 private fun IdleScreen(vm: ReadViewModel) {
     var can by remember { mutableStateOf(vm.can) }
     var pin by remember { mutableStateOf(vm.pin) }
+    var includePhoto by remember { mutableStateOf(vm.includePhoto) }
 
     val canValid = Validation.isValidCan(can)
     val pinValid = Validation.isValidPin(pin)
@@ -194,7 +196,27 @@ private fun IdleScreen(vm: ReadViewModel) {
                         modifier = Modifier.fillMaxWidth(),
                     )
 
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Include fotografia (mai lent)",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Switch(
+                            checked = includePhoto,
+                            onCheckedChange = { checked ->
+                                includePhoto = checked
+                                vm.includePhoto = checked
+                            },
+                        )
+                    }
+
+                    Spacer(Modifier.height(8.dp))
 
                     when {
                         nfcStatus == NfcStatus.NO_HARDWARE -> Text(
