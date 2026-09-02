@@ -22,8 +22,9 @@ import dev.ceireader.app.R
 
 /**
  * "Secure document" palette: deep navy + a refined, sparingly-used gold
- * accent. [ic_launcher_background] in `res/values/colors.xml` shares the
- * same navy so the launcher icon and in-app theme read as one brand.
+ * accent. [ic_launcher_background] in `res/values/colors.xml` (#0E1B33) is
+ * intentionally a deeper navy than this in-app primary (#22447F) -- close
+ * enough to read as the same brand family, but distinct shades by design.
  */
 private val NavyPrimaryLight = Color(0xFF22447F)
 private val NavyPrimaryDark = Color(0xFF9FC0FF)
