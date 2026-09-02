@@ -30,6 +30,9 @@ class ReadViewModel : ViewModel() {
     var can by mutableStateOf("")
     var pin by mutableStateOf("")
 
+    /** "Include fotografia" switch on the entry screen; OFF by default (fast, text-only read). */
+    var includePhoto by mutableStateOf(false)
+
     /**
      * Reflects [dev.ceireader.app.nfc.NfcReaderController.status]; kept in sync by
      * [dev.ceireader.app.MainActivity] on resume and on NFC adapter-state broadcasts,
@@ -60,7 +63,7 @@ class ReadViewModel : ViewModel() {
         if (!isProcessing.compareAndSet(false, true)) return // a read is already in progress; ignore.
         viewModelScope.launch {
             try {
-                reader.read(isoDep, can, pin).collect { newState ->
+                reader.read(isoDep, can, pin, includePhoto).collect { newState ->
                     _state.value = newState
                 }
             } finally {

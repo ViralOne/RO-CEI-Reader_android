@@ -14,10 +14,10 @@ import org.jmrtd.lds.SecurityInfo
 import org.jmrtd.protocol.PACEAPDUSender
 import org.jmrtd.protocol.PACEProtocol
 
-/** Thrown by [NationalApplet.login] when VERIFY PIN returns SW=63Cx. */
+/** Thrown by [NationalApplet.verifyPinAndSelectDf] when VERIFY PIN returns SW=63Cx. */
 class WrongPinException(val retriesLeft: Int) : Exception("Wrong PIN, $retriesLeft attempt(s) left")
 
-/** Thrown by [NationalApplet.login] when the PIN is blocked (no retries left). */
+/** Thrown by [NationalApplet.verifyPinAndSelectDf] when the PIN is blocked (no retries left). */
 class PinBlockedException : Exception("PIN is blocked")
 
 /**
@@ -52,18 +52,41 @@ class NationalApplet(private val isoDep: IsoDep, private val can: String) {
     private val cardService = IsoDepCardService(isoDep)
     private var wrapper: APDUWrapper? = null
 
-    /** SELECTs the national applet, runs PACE #2, and verifies the PIN. */
-    fun login(pin: String) {
+    /**
+     * Steps 1-2 of the national applet flow: SELECT the national applet AID
+     * and run PACE #2. Called directly by [CeiCardReader], followed by
+     * [verifyPinAndSelectDf].
+     *
+     * [cardService.open] here is what actually performs the physical
+     * [isoDep] connect when called on a FRESH tag (it's a no-op only when
+     * [isoDep] is already connected -- see class kdoc). PACE #2 below never
+     * reads EF.CardAccess; it uses the hardcoded OID/curve params in
+     * [runPace], so unlike [PaceSession] it never depended on a prior ICAO
+     * PACE having discovered anything from the card. The one genuinely new
+     * assumption when this is called WITHOUT a preceding [PaceSession.open]
+     * (the fast, no-photo read path) is that a plaintext SELECT of the
+     * national AID is accepted as the very first command against a freshly
+     * connected tag, exactly as it already is after the full ICAO
+     * PACE+sendSelectApplet sequence (which, per the class kdoc, resets the
+     * security environment before this SELECT anyway) -- i.e. this SELECT
+     * should be state-independent either way. NOT verified on real hardware
+     * in this order yet; flagged for on-device testing.
+     */
+    fun selectApplicationAndPace() {
         cardService.open()
 
         // Step 1 (spec ss5 step 4): plaintext SELECT of the national applet,
-        // sent raw -- NOT through PaceSession's (now-dead) secure channel.
+        // sent raw -- NOT through PaceSession's (now-dead, or in the no-photo
+        // fast path, never-established) secure channel.
         val selectResp = transmitRaw(Apdu.selectByAid(NATIONAL_AID_HEX))
         check9000(selectResp.sw, "SELECT national applet")
 
         // Step 2 (spec ss5 step 5): second full PACE(CAN) -> fresh secure channel.
         wrapper = runPace()
+    }
 
+    /** Steps 3-4 of the national applet flow: VERIFY PIN, then SELECT the eID DF. */
+    fun verifyPinAndSelectDf(pin: String) {
         // Step 3 (spec ss5 step 6): VERIFY PIN over the new secure channel.
         val verify = transmitSecure(Apdu.verifyPin(pin))
         mapPinSw(verify.sw)

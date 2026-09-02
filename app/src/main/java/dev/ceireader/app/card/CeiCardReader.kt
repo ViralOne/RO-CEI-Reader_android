@@ -1,6 +1,7 @@
 package dev.ceireader.app.card
 
 import android.nfc.tech.IsoDep
+import android.util.Log
 import dev.ceireader.app.model.CeiData
 import dev.ceireader.app.model.ReadErrorKind
 import dev.ceireader.app.model.ReadState
@@ -15,7 +16,7 @@ import net.sf.scuba.smartcards.CardServiceException
 /**
  * Orchestrates the full Romanian eID card read on an already-connected
  * [IsoDep] tag: PACE(CAN) + DG2 photo over the ICAO applet, then the
- * national applet login + the six personal-data EFs, decoded into a single
+ * national applet SELECT + PACE#2 + PIN + the six personal-data EFs, decoded into a single
  * [CeiData]. Mirrors the sequence hardware-verified in the MainActivity
  * debug harness (Tasks 5/6).
  */
@@ -26,20 +27,70 @@ class CeiCardReader {
      * [ReadState.Finished] on success, or [ReadState.Error] (via [mapError])
      * on failure. Intended to run on [Dispatchers.IO]; card resources opened
      * during the read are always closed before the flow completes.
+     *
+     * [includePhoto] (default `false`) picks one of two flows:
+     * - `false` (fast path): skips [PaceSession] entirely -- no ICAO PACE,
+     *   no DG2 read -- and goes straight to the national applet (SELECT +
+     *   PACE#2 + PIN + the six text EFs), producing [CeiData] with
+     *   `faceImage = null`. This removes one full PACE handshake and the
+     *   DG2 round trips.
+     * - `true` (full path): the original flow (PACE#1 -> DG2 -> national
+     *   applet -> PACE#2 -> PIN -> EFs), using extended-length APDUs for the
+     *   DG2 read when the tag supports them (see [PaceSession.open]).
      */
-    fun read(isoDep: IsoDep, can: String, pin: String): Flow<ReadState> = flow {
+    fun read(isoDep: IsoDep, can: String, pin: String, includePhoto: Boolean = false): Flow<ReadState> = flow {
         emit(ReadState.Started)
         var paceSession: PaceSession? = null
         try {
-            val session = PaceSession(isoDep)
-            paceSession = session
-            val passportService = session.open(can)
-            val photo = session.readFacePhoto(passportService)
+            var photo: ByteArray? = null
+
+            if (includePhoto) {
+                val extendedSupported = isoDep.isExtendedLengthApduSupported()
+                var session = PaceSession(isoDep)
+                paceSession = session
+
+                photo = try {
+                    val passportService = session.open(can, extendedSupported)
+                    val bytes = session.readFacePhoto(passportService)
+                    Log.d(TAG, "DG2 read succeeded (extended=$extendedSupported)")
+                    bytes
+                } catch (e: Exception) {
+                    // Safe fallback (finding 1): the tag reported
+                    // extended-length support but the FIRST extended-length
+                    // open+DG2 attempt still failed -- either as a
+                    // CardServiceException (JMRTD-level failure) or as an
+                    // IOException/TagLostException (the extended-length
+                    // transceive itself was rejected by the NFC
+                    // stack/hardware, which can surface from either open() or
+                    // the DG2 read). Either way, retry the whole open+DG2
+                    // read at normal length rather than surfacing a spurious
+                    // failure. Only re-throw if this wasn't an
+                    // extended-length attempt to begin with, or if the
+                    // exception isn't one of the two retryable types -- in
+                    // which case the normal-length retry below has already
+                    // failed too, and its exception propagates as-is. No PII
+                    // in this log: only the exception class name, never card
+                    // data.
+                    if (!extendedSupported || (e !is CardServiceException && e !is IOException)) throw e
+                    Log.d(
+                        TAG,
+                        "extended-length DG2 attempt failed (${e.javaClass.simpleName}); retrying with normal length",
+                    )
+                    session.close()
+                    session = PaceSession(isoDep)
+                    paceSession = session
+                    val passportService = session.open(can, false)
+                    val bytes = session.readFacePhoto(passportService)
+                    Log.d(TAG, "DG2 read succeeded on normal-length retry")
+                    bytes
+                }
+            }
 
             emit(ReadState.ReadingCard)
 
             val applet = NationalApplet(isoDep, can)
-            applet.login(pin)
+            applet.selectApplicationAndPace()
+            applet.verifyPinAndSelectDf(pin)
 
             val personal = CeiAsn1Decoder.decodePersonal(applet.readEf("0101"))
             val birth = CeiAsn1Decoder.decodeBirth(applet.readEf("0102"))
@@ -70,8 +121,9 @@ class CeiCardReader {
 
             emit(ReadState.Finished(data))
         } finally {
-            // Only PaceSession needs explicit cleanup: NationalApplet's
-            // IsoDepCardService.open() is a no-op over the same already-connected
+            // Only PaceSession needs explicit cleanup (and only when the full,
+            // includePhoto=true path ran it at all): NationalApplet's
+            // IsoDepCardService.open() is a no-op over an already-connected
             // isoDep (see NationalApplet kdoc), and the tag connection itself is
             // owned by the caller (NfcReaderController). PaceSession.close() (not
             // just `.service?.close()`) is used here because `service` is a
@@ -93,5 +145,9 @@ class CeiCardReader {
         is IOException -> ReadState.Error(ReadErrorKind.CARD_LOST)
         is CardServiceException -> ReadState.Error(ReadErrorKind.COMMUNICATION)
         else -> ReadState.Error(ReadErrorKind.UNKNOWN)
+    }
+
+    companion object {
+        private const val TAG = "CeiCardReader"
     }
 }

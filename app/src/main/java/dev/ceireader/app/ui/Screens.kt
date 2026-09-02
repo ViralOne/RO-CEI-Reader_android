@@ -49,6 +49,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -64,6 +65,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -112,12 +114,14 @@ fun CeiApp(vm: ReadViewModel) {
 private fun IdleScreen(vm: ReadViewModel) {
     var can by remember { mutableStateOf(vm.can) }
     var pin by remember { mutableStateOf(vm.pin) }
+    var includePhoto by remember { mutableStateOf(vm.includePhoto) }
 
     val canValid = Validation.isValidCan(can)
     val pinValid = Validation.isValidPin(pin)
     val nfcStatus = vm.nfcStatus
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     Scaffold { padding ->
         Column(
@@ -181,6 +185,14 @@ private fun IdleScreen(vm: ReadViewModel) {
                             val filtered = new.filter { it.isDigit() }.take(4)
                             pin = filtered
                             vm.pin = filtered
+                            if (filtered.length == 4) {
+                                // Auto-hide the keyboard once the 4-digit PIN
+                                // is complete: clearFocus() alone can leave
+                                // the IME visible on some devices, so also
+                                // explicitly hide it via the keyboard controller.
+                                focusManager.clearFocus()
+                                keyboardController?.hide()
+                            }
                         },
                         label = { Text("PIN") },
                         supportingText = { Text("PIN-ul cardului din 4 cifre") },
@@ -194,7 +206,27 @@ private fun IdleScreen(vm: ReadViewModel) {
                         modifier = Modifier.fillMaxWidth(),
                     )
 
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Include fotografia (mai lent)",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Switch(
+                            checked = includePhoto,
+                            onCheckedChange = { checked ->
+                                includePhoto = checked
+                                vm.includePhoto = checked
+                            },
+                        )
+                    }
+
+                    Spacer(Modifier.height(8.dp))
 
                     when {
                         nfcStatus == NfcStatus.NO_HARDWARE -> Text(
