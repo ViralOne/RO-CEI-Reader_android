@@ -66,12 +66,14 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ceireader.app.BuildConfig
 import dev.ceireader.app.model.AddressPeriod
@@ -266,14 +268,15 @@ private fun IdleScreen(vm: ReadViewModel) {
                             Icon(
                                 imageVector = Icons.Filled.Nfc,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.secondary,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp),
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
                                 text = "Pregătit. Apropiați cardul de spatele telefonului.",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.secondary,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.primary,
                                 textAlign = TextAlign.Center,
                             )
                         }
@@ -285,8 +288,8 @@ private fun IdleScreen(vm: ReadViewModel) {
 
             Text(
                 text = "v${BuildConfig.VERSION_NAME}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center,
             )
         }
@@ -329,23 +332,27 @@ private fun ReadingScreen() {
             modifier = Modifier.padding(horizontal = 32.dp),
         ) {
             Box(contentAlignment = Alignment.Center) {
+                // The gold accent is reserved for exactly this moment -- the
+                // one place where the app is actively broadcasting/reading --
+                // so it reads as a deliberate signal, not decoration.
                 CircularProgressIndicator(
                     modifier = Modifier.size(140.dp),
                     strokeWidth = 4.dp,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    trackColor = MaterialTheme.colorScheme.tertiaryContainer,
                 )
                 Box(
                     modifier = Modifier
                         .size(88.dp)
                         .scale(scale)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
+                        .background(MaterialTheme.colorScheme.tertiaryContainer),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Nfc,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
                         modifier = Modifier.size(44.dp),
                     )
                 }
@@ -441,7 +448,7 @@ private fun ResultScreen(data: CeiData, onReset: () -> Unit) {
         Spacer(Modifier.height(24.dp))
 
         SectionCard(title = "Identitate") {
-            InfoRow("CNP", data.cnp)
+            InfoRow("CNP", data.cnp, monospace = true)
             InfoRow("Sex", data.gender)
             InfoRow("Cetățenie", data.citizenship)
         }
@@ -452,7 +459,7 @@ private fun ResultScreen(data: CeiData, onReset: () -> Unit) {
         }
 
         SectionCard(title = "Document") {
-            InfoRow("Serie și număr", data.documentSerialNo)
+            InfoRow("Serie și număr", data.documentSerialNo, monospace = true)
             InfoRow("Autoritate emitentă", data.issuingAuthority)
             InfoRow("Data emiterii", data.issuingDate)
             InfoRow("Data expirării", data.expiryDate)
@@ -533,19 +540,22 @@ private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Un
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
+            // Small-caps-style gold label: the accent is deliberate here (a
+            // section header) rather than spread across the whole card.
             Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.primary,
+                text = title.uppercase(),
+                style = MaterialTheme.typography.labelLarge.copy(letterSpacing = 1.4.sp),
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.tertiary,
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
             content()
         }
     }
 }
 
 @Composable
-private fun InfoRow(label: String, value: String?) {
+private fun InfoRow(label: String, value: String?, monospace: Boolean = false) {
     // A null/blank value means the EF didn't carry this field -- render nothing rather
     // than a labeled row with a "—" placeholder.
     if (value.isNullOrBlank()) return
@@ -564,6 +574,7 @@ private fun InfoRow(label: String, value: String?) {
         Text(
             text = value,
             style = MaterialTheme.typography.bodyLarge,
+            fontFamily = if (monospace) FontFamily.Monospace else null,
             fontWeight = FontWeight.Medium,
         )
     }
