@@ -14,10 +14,10 @@ import org.jmrtd.lds.SecurityInfo
 import org.jmrtd.protocol.PACEAPDUSender
 import org.jmrtd.protocol.PACEProtocol
 
-/** Thrown by [NationalApplet.login] when VERIFY PIN returns SW=63Cx. */
+/** Thrown by [NationalApplet.verifyPinAndSelectDf] when VERIFY PIN returns SW=63Cx. */
 class WrongPinException(val retriesLeft: Int) : Exception("Wrong PIN, $retriesLeft attempt(s) left")
 
-/** Thrown by [NationalApplet.login] when the PIN is blocked (no retries left). */
+/** Thrown by [NationalApplet.verifyPinAndSelectDf] when the PIN is blocked (no retries left). */
 class PinBlockedException : Exception("PIN is blocked")
 
 /**
@@ -52,15 +52,10 @@ class NationalApplet(private val isoDep: IsoDep, private val can: String) {
     private val cardService = IsoDepCardService(isoDep)
     private var wrapper: APDUWrapper? = null
 
-    /** SELECTs the national applet, runs PACE #2, and verifies the PIN. */
-    fun login(pin: String) {
-        selectApplicationAndPace()
-        verifyPinAndSelectDf(pin)
-    }
-
     /**
-     * Steps 1-2 of [login], split out so [CeiCardReader] can time SELECT +
-     * PACE#2 separately from PIN verification.
+     * Steps 1-2 of the national applet flow: SELECT the national applet AID
+     * and run PACE #2. Called directly by [CeiCardReader], followed by
+     * [verifyPinAndSelectDf].
      *
      * [cardService.open] here is what actually performs the physical
      * [isoDep] connect when called on a FRESH tag (it's a no-op only when
@@ -90,7 +85,7 @@ class NationalApplet(private val isoDep: IsoDep, private val can: String) {
         wrapper = runPace()
     }
 
-    /** Steps 3-4 of [login]: VERIFY PIN, then SELECT the eID DF. */
+    /** Steps 3-4 of the national applet flow: VERIFY PIN, then SELECT the eID DF. */
     fun verifyPinAndSelectDf(pin: String) {
         // Step 3 (spec ss5 step 6): VERIFY PIN over the new secure channel.
         val verify = transmitSecure(Apdu.verifyPin(pin))
