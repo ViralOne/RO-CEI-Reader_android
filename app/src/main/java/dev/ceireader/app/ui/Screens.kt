@@ -558,7 +558,7 @@ private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Un
             // Small-caps-style gold label: the accent is deliberate here (a
             // section header) rather than spread across the whole card.
             Text(
-                text = title.uppercase(),
+                text = title.uppercase(java.util.Locale.ROOT),
                 style = MaterialTheme.typography.labelLarge.copy(letterSpacing = 1.4.sp),
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.tertiary,
