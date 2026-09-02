@@ -65,6 +65,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -120,6 +121,7 @@ private fun IdleScreen(vm: ReadViewModel) {
     val nfcStatus = vm.nfcStatus
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     Scaffold { padding ->
         Column(
@@ -183,6 +185,14 @@ private fun IdleScreen(vm: ReadViewModel) {
                             val filtered = new.filter { it.isDigit() }.take(4)
                             pin = filtered
                             vm.pin = filtered
+                            if (filtered.length == 4) {
+                                // Auto-hide the keyboard once the 4-digit PIN
+                                // is complete: clearFocus() alone can leave
+                                // the IME visible on some devices, so also
+                                // explicitly hide it via the keyboard controller.
+                                focusManager.clearFocus()
+                                keyboardController?.hide()
+                            }
                         },
                         label = { Text("PIN") },
                         supportingText = { Text("PIN-ul cardului din 4 cifre") },

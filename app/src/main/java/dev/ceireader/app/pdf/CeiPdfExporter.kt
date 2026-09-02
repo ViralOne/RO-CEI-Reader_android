@@ -49,6 +49,8 @@ object CeiPdfExporter {
     private const val FOOTER_TEXT =
         "Acest document este generat cu acordul utilizatorului prin intermediul aplicației CEI Reader."
 
+    private const val NO_PHOTO_NOTE = "Fotografia nu a fost inclusă în această citire."
+
     /** Writes the PDF to the cache dir and returns a shareable content [Uri] for it. */
     fun export(context: Context, data: CeiData): Uri {
         val document = PdfDocument()
@@ -101,6 +103,12 @@ object CeiPdfExporter {
             textSize = 14f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             color = android.graphics.Color.BLACK
+        }
+        val noPhotoNotePaint = TextPaint().apply {
+            isAntiAlias = true
+            textSize = 11f
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.ITALIC)
+            color = android.graphics.Color.GRAY
         }
 
         val rows = listOf(
@@ -155,6 +163,17 @@ object CeiPdfExporter {
             val destRect = android.graphics.RectF(MARGIN, y, MARGIN + PHOTO_WIDTH, y + photoHeight)
             canvas.drawBitmap(bitmap, null, destRect, null)
             y += photoHeight
+        } else {
+            // Fast/no-photo read (or a photo that failed to decode): state
+            // plainly that it wasn't included rather than leaving a blank
+            // photo area.
+            val noteLayout = staticLayout(NO_PHOTO_NOTE, noPhotoNotePaint, VALUE_WIDTH)
+            if (y + noteLayout.height > CONTENT_BOTTOM) newPage()
+            canvas.save()
+            canvas.translate(MARGIN, y)
+            noteLayout.draw(canvas)
+            canvas.restore()
+            y += noteLayout.height
         }
 
         drawFooter(canvas)
