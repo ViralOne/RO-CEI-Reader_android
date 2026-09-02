@@ -10,9 +10,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -65,12 +64,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.ClipboardManager
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -91,7 +90,6 @@ import dev.ceireader.app.model.ReadState
 import dev.ceireader.app.model.Validation
 import dev.ceireader.app.pdf.CeiPdfExporter
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -396,7 +394,6 @@ private fun ResultScreen(data: CeiData, onReset: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    val clipboardManager = LocalClipboardManager.current
     var isExporting by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -454,7 +451,7 @@ private fun ResultScreen(data: CeiData, onReset: () -> Unit) {
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
             modifier = if (fullName.isNotBlank()) {
-                Modifier.copyOnLongPress(fullName, clipboardManager, scope, snackbarHostState)
+                Modifier.copyOnLongPress(fullName, snackbarHostState)
             } else {
                 Modifier
             },
@@ -463,34 +460,34 @@ private fun ResultScreen(data: CeiData, onReset: () -> Unit) {
         Spacer(Modifier.height(24.dp))
 
         SectionCard(title = "Identitate") {
-            InfoRow("CNP", data.cnp, clipboardManager, scope, snackbarHostState, monospace = true)
-            InfoRow("Sex", data.gender, clipboardManager, scope, snackbarHostState)
-            InfoRow("Cetățenie", data.citizenship, clipboardManager, scope, snackbarHostState)
+            InfoRow("CNP", data.cnp, snackbarHostState, monospace = true)
+            InfoRow("Sex", data.gender, snackbarHostState)
+            InfoRow("Cetățenie", data.citizenship, snackbarHostState)
         }
 
         SectionCard(title = "Naștere") {
-            InfoRow("Data nașterii", data.birthDate, clipboardManager, scope, snackbarHostState)
-            InfoRow("Locul nașterii", data.placeOfBirth, clipboardManager, scope, snackbarHostState)
+            InfoRow("Data nașterii", data.birthDate, snackbarHostState)
+            InfoRow("Locul nașterii", data.placeOfBirth, snackbarHostState)
         }
 
         SectionCard(title = "Document") {
-            InfoRow("Serie și număr", data.documentSerialNo, clipboardManager, scope, snackbarHostState, monospace = true)
-            InfoRow("Autoritate emitentă", data.issuingAuthority, clipboardManager, scope, snackbarHostState)
-            InfoRow("Data emiterii", data.issuingDate, clipboardManager, scope, snackbarHostState)
-            InfoRow("Data expirării", data.expiryDate, clipboardManager, scope, snackbarHostState)
+            InfoRow("Serie și număr", data.documentSerialNo, snackbarHostState, monospace = true)
+            InfoRow("Autoritate emitentă", data.issuingAuthority, snackbarHostState)
+            InfoRow("Data emiterii", data.issuingDate, snackbarHostState)
+            InfoRow("Data expirării", data.expiryDate, snackbarHostState)
         }
 
         SectionCard(title = "Adresă") {
-            InfoRow("Domiciliu", data.currentAddress, clipboardManager, scope, snackbarHostState)
+            InfoRow("Domiciliu", data.currentAddress, snackbarHostState)
             if (data.temporaryAddresses.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 Text("Reședințe temporare", style = MaterialTheme.typography.labelLarge)
-                data.temporaryAddresses.forEach { AddressPeriodRow(it, clipboardManager, scope, snackbarHostState) }
+                data.temporaryAddresses.forEach { AddressPeriodRow(it, snackbarHostState) }
             }
             if (data.foreignAddresses.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 Text("Adrese în străinătate", style = MaterialTheme.typography.labelLarge)
-                data.foreignAddresses.forEach { AddressPeriodRow(it, clipboardManager, scope, snackbarHostState) }
+                data.foreignAddresses.forEach { AddressPeriodRow(it, snackbarHostState) }
             }
         }
 
@@ -573,8 +570,6 @@ private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Un
 private fun InfoRow(
     label: String,
     value: String?,
-    clipboardManager: ClipboardManager,
-    scope: CoroutineScope,
     snackbarHostState: SnackbarHostState,
     monospace: Boolean = false,
 ) {
@@ -598,7 +593,7 @@ private fun InfoRow(
             style = MaterialTheme.typography.bodyLarge,
             fontFamily = if (monospace) FontFamily.Monospace else null,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.copyOnLongPress(value, clipboardManager, scope, snackbarHostState),
+            modifier = Modifier.copyOnLongPress(value, snackbarHostState),
         )
     }
 }
@@ -606,15 +601,13 @@ private fun InfoRow(
 @Composable
 private fun AddressPeriodRow(
     period: AddressPeriod,
-    clipboardManager: ClipboardManager,
-    scope: CoroutineScope,
     snackbarHostState: SnackbarHostState,
 ) {
     Column(modifier = Modifier.padding(vertical = 4.dp)) {
         Text(
             text = period.address,
             style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.copyOnLongPress(period.address, clipboardManager, scope, snackbarHostState),
+            modifier = Modifier.copyOnLongPress(period.address, snackbarHostState),
         )
         Text(
             text = "${period.startDate ?: "?"} – ${period.endDate ?: "prezent"}",
@@ -627,28 +620,28 @@ private fun AddressPeriodRow(
 /**
  * Makes any [Text] (or other composable) long-press-copyable: a long press
  * copies [text] to the clipboard and shows a brief confirmation on
- * [snackbarHostState]. The plain tap ([onClick]) is a no-op -- these values
- * aren't otherwise interactive -- so the long press is the entire
- * affordance, kept deliberately subtle (no visual change) rather than adding
- * chrome to every result-screen row. [contentDescription] carries the same
- * hint to screen readers without hiding the value itself from TalkBack.
+ * [snackbarHostState]. There is deliberately no `onClick` -- these values
+ * aren't otherwise interactive, so a tap adds neither a ripple nor a
+ * phantom action. [androidx.compose.ui.semantics.onLongClick] announces the
+ * long-press affordance to TalkBack as a named accessibility action
+ * ("Copiază") without overriding or duplicating the value's own text, so
+ * the value is announced once and the copy action is offered alongside it.
  */
-@OptIn(ExperimentalFoundationApi::class)
+@Composable
 private fun Modifier.copyOnLongPress(
     text: String,
-    clipboardManager: ClipboardManager,
-    scope: CoroutineScope,
     snackbarHostState: SnackbarHostState,
-): Modifier = this
-    .combinedClickable(
-        onClick = {},
-        onLongClickLabel = "Copiază în clipboard",
-        onLongClick = {
-            clipboardManager.setText(AnnotatedString(text))
-            scope.launch { snackbarHostState.showSnackbar("Copiat în clipboard") }
-        },
-    )
-    .semantics { contentDescription = "$text. Țineți apăsat pentru a copia" }
+): Modifier {
+    val clipboardManager = LocalClipboardManager.current
+    val scope = rememberCoroutineScope()
+    val copy: () -> Unit = {
+        clipboardManager.setText(AnnotatedString(text))
+        scope.launch { snackbarHostState.showSnackbar("Copiat în clipboard") }
+    }
+    return this
+        .pointerInput(text) { detectTapGestures(onLongPress = { copy() }) }
+        .semantics { onLongClick(label = "Copiază") { copy(); true } }
+}
 
 // ---------------------------------------------------------------------------
 // Error screen
