@@ -140,19 +140,31 @@ class PaceSession(private val isoDep: IsoDep) {
         private const val EXTENDED_SM_OVERHEAD_BYTES = 64
 
         /**
+         * Floor for the computed block size: small enough to stay well under
+         * any device's [IsoDep.getMaxTransceiveLength], but large enough that
+         * a chained READ BINARY still makes forward progress.
+         */
+        private const val MIN_BLOCK_SIZE = 64
+
+        /**
          * Largest READ BINARY block size safe to request when extended-length
          * APDUs are in play: bounded above by both what the hardware/NFC stack
-         * can move in one [IsoDep] transceive and by
-         * [PassportService.EXTENDED_MAX_TRANCEIVE_LENGTH] (JMRTD's own ceiling),
-         * and never below the original [PassportService.DEFAULT_MAX_BLOCKSIZE]
-         * so this is always >= the pre-optimization behavior.
+         * can move in one [IsoDep] transceive (minus SM headroom) and by
+         * [PassportService.EXTENDED_MAX_TRANCEIVE_LENGTH] (JMRTD's own
+         * ceiling). Unlike a naive `coerceIn(DEFAULT_MAX_BLOCKSIZE, ...)`, this
+         * must NEVER be pushed up to [PassportService.DEFAULT_MAX_BLOCKSIZE]
+         * (223) when the device's real transceive limit is smaller than that
+         * (many NFC controllers report ~253-261 bytes total, i.e. a hardware
+         * limit well under 223 once SM overhead is subtracted) -- doing so
+         * would request a block larger than the transceive can actually carry
+         * and fail the read outright. So this only ever picks the SMALLER of
+         * the desired block and the hardware limit, with [MIN_BLOCK_SIZE] as a
+         * sane floor.
          */
         private fun computeMaxBlockSize(isoDep: IsoDep): Int {
             val hardwareLimit = isoDep.maxTransceiveLength - EXTENDED_SM_OVERHEAD_BYTES
-            return hardwareLimit.coerceIn(
-                PassportService.DEFAULT_MAX_BLOCKSIZE,
-                PassportService.EXTENDED_MAX_TRANCEIVE_LENGTH,
-            )
+            val desiredBlock = PassportService.EXTENDED_MAX_TRANCEIVE_LENGTH
+            return minOf(desiredBlock, hardwareLimit).coerceAtLeast(MIN_BLOCK_SIZE)
         }
     }
 }

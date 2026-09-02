@@ -16,7 +16,7 @@ import net.sf.scuba.smartcards.CardServiceException
 /**
  * Orchestrates the full Romanian eID card read on an already-connected
  * [IsoDep] tag: PACE(CAN) + DG2 photo over the ICAO applet, then the
- * national applet login + the six personal-data EFs, decoded into a single
+ * national applet SELECT + PACE#2 + PIN + the six personal-data EFs, decoded into a single
  * [CeiData]. Mirrors the sequence hardware-verified in the MainActivity
  * debug harness (Tasks 5/6).
  */
@@ -41,80 +41,63 @@ class CeiCardReader {
     fun read(isoDep: IsoDep, can: String, pin: String, includePhoto: Boolean = false): Flow<ReadState> = flow {
         emit(ReadState.Started)
         var paceSession: PaceSession? = null
-        // TEMP: perf timing, remove before release.
-        val tTotalStart = System.currentTimeMillis()
-        var pace1Ms = 0L
-        var dg2Ms = 0L
-        var dg2Bytes = 0
-        var extendedUsed = false
         try {
             var photo: ByteArray? = null
 
             if (includePhoto) {
                 val extendedSupported = isoDep.isExtendedLengthApduSupported()
-                extendedUsed = extendedSupported
                 var session = PaceSession(isoDep)
                 paceSession = session
 
-                // TEMP: perf timing, remove before release.
-                val tPace1Start = System.currentTimeMillis()
-                var passportService = session.open(can, extendedSupported)
-                pace1Ms = System.currentTimeMillis() - tPace1Start
-
-                val tDg2Start = System.currentTimeMillis()
                 photo = try {
-                    session.readFacePhoto(passportService)
-                } catch (e: CardServiceException) {
-                    // Safe fallback (task 1): the tag reported extended-length
-                    // support but the FIRST DG2 read still failed -- retry the
-                    // whole open with the original normal (256) length rather
-                    // than surfacing a spurious failure. No PII in this log:
-                    // only the exception class name, never card data.
-                    if (!extendedSupported) throw e
+                    val passportService = session.open(can, extendedSupported)
+                    val bytes = session.readFacePhoto(passportService)
+                    Log.d(TAG, "DG2 read succeeded (extended=$extendedSupported)")
+                    bytes
+                } catch (e: Exception) {
+                    // Safe fallback (finding 1): the tag reported
+                    // extended-length support but the FIRST extended-length
+                    // open+DG2 attempt still failed -- either as a
+                    // CardServiceException (JMRTD-level failure) or as an
+                    // IOException/TagLostException (the extended-length
+                    // transceive itself was rejected by the NFC
+                    // stack/hardware, which can surface from either open() or
+                    // the DG2 read). Either way, retry the whole open+DG2
+                    // read at normal length rather than surfacing a spurious
+                    // failure. Only re-throw if this wasn't an
+                    // extended-length attempt to begin with, or if the
+                    // exception isn't one of the two retryable types -- in
+                    // which case the normal-length retry below has already
+                    // failed too, and its exception propagates as-is. No PII
+                    // in this log: only the exception class name, never card
+                    // data.
+                    if (!extendedSupported || (e !is CardServiceException && e !is IOException)) throw e
                     Log.d(
-                        PERF_TAG,
-                        "PERF dg2 extended-length attempt failed (${e.javaClass.simpleName}); retrying with normal length",
+                        TAG,
+                        "extended-length DG2 attempt failed (${e.javaClass.simpleName}); retrying with normal length",
                     )
                     session.close()
                     session = PaceSession(isoDep)
                     paceSession = session
-                    extendedUsed = false
-                    passportService = session.open(can, false)
-                    session.readFacePhoto(passportService)
+                    val passportService = session.open(can, false)
+                    val bytes = session.readFacePhoto(passportService)
+                    Log.d(TAG, "DG2 read succeeded on normal-length retry")
+                    bytes
                 }
-                dg2Ms = System.currentTimeMillis() - tDg2Start
-                dg2Bytes = photo.size
             }
 
             emit(ReadState.ReadingCard)
 
             val applet = NationalApplet(isoDep, can)
-            // TEMP: perf timing, remove before release.
-            val tAppletStart = System.currentTimeMillis()
             applet.selectApplicationAndPace()
-            val appletMs = System.currentTimeMillis() - tAppletStart
-
-            val tPinStart = System.currentTimeMillis()
             applet.verifyPinAndSelectDf(pin)
-            val pinMs = System.currentTimeMillis() - tPinStart
 
-            val tEfsStart = System.currentTimeMillis()
             val personal = CeiAsn1Decoder.decodePersonal(applet.readEf("0101"))
             val birth = CeiAsn1Decoder.decodeBirth(applet.readEf("0102"))
             val issuer = CeiAsn1Decoder.decodeIssuer(applet.readEf("0104"))
             val currentAddress = CeiAsn1Decoder.decodeAddress(applet.readEf("0106"))
             val temporary = CeiAsn1Decoder.decodeAddressPeriods(applet.readEf("0107"))
             val foreign = CeiAsn1Decoder.decodeAddressPeriods(applet.readEf("0108"))
-            val efsMs = System.currentTimeMillis() - tEfsStart
-
-            val totalMs = System.currentTimeMillis() - tTotalStart
-            // TEMP: perf timing, remove before release. Durations/byte counts/
-            // booleans only -- no field values, no card data.
-            Log.d(
-                PERF_TAG,
-                "PERF photo=$includePhoto pace1=${pace1Ms}ms dg2=${dg2Ms}ms(bytes=$dg2Bytes) " +
-                    "applet+pace2=${appletMs}ms pin=${pinMs}ms efs=${efsMs}ms total=${totalMs}ms extended=$extendedUsed",
-            )
 
             val data = CeiData(
                 lastName = personal.lastName,
@@ -165,7 +148,6 @@ class CeiCardReader {
     }
 
     companion object {
-        // TEMP: perf timing, remove before release.
-        private const val PERF_TAG = "PERF"
+        private const val TAG = "CeiCardReader"
     }
 }
