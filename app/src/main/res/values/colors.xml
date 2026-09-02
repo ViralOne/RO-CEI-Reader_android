@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Brand palette ("secure document": deep navy + refined gold accent).
+      Centralized here so the launcher icon and the Compose theme (see
+      ui/Theme.kt) draw from the same values.
+    -->
+    <color name="ic_launcher_background">#0E1B33</color>
+
+    <color name="brand_navy_deep">#0E1B33</color>
+    <color name="brand_gold">#C9A227</color>
+    <color name="brand_white">#FFFFFF</color>
+</resources>
