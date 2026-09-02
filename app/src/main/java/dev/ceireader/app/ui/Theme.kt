@@ -13,29 +13,66 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.ceireader.app.R
 
-private val SeedBlue = Color(0xFF2A5EAA)
-private val SeedBlueDark = Color(0xFF9FC4FF)
+/**
+ * "Secure document" palette: deep navy + a refined, sparingly-used gold
+ * accent. [ic_launcher_background] in `res/values/colors.xml` (#0E1B33) is
+ * intentionally a deeper navy than this in-app primary (#22447F) -- close
+ * enough to read as the same brand family, but distinct shades by design.
+ */
+private val NavyPrimaryLight = Color(0xFF22447F)
+private val NavyPrimaryDark = Color(0xFF9FC0FF)
+private val GoldAccentLight = Color(0xFFA9791C)
+private val GoldAccentDark = Color(0xFFE7C069)
 
 private val LightColors = lightColorScheme(
-    primary = SeedBlue,
-    onPrimary = Color.White,
-    secondary = Color(0xFF3D6E4C),
-    background = Color(0xFFF7F8FA),
+    primary = NavyPrimaryLight,
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFD7E3F7),
+    onPrimaryContainer = Color(0xFF0F2A52),
+    secondary = Color(0xFF5B6B82), // muted slate
+    onSecondary = Color(0xFFFFFFFF),
+    secondaryContainer = Color(0xFFE3E7ED),
+    onSecondaryContainer = Color(0xFF2B3648),
+    tertiary = GoldAccentLight, // refined gold accent -- used sparingly
+    onTertiary = Color(0xFFFFFFFF),
+    tertiaryContainer = Color(0xFFF3E3BE),
+    onTertiaryContainer = Color(0xFF4A3607),
+    background = Color(0xFFF5F6F9),
+    onBackground = Color(0xFF1A2233),
     surface = Color(0xFFFFFFFF),
-    surfaceVariant = Color(0xFFE7ECF2),
+    onSurface = Color(0xFF1A2233),
+    surfaceVariant = Color(0xFFE6E9F0),
+    onSurfaceVariant = Color(0xFF48505F),
+    outline = Color(0xFF7C8494),
 )
 
 private val DarkColors = darkColorScheme(
-    primary = SeedBlueDark,
+    primary = NavyPrimaryDark, // light blue
     onPrimary = Color(0xFF0B2545),
-    secondary = Color(0xFFA8D5B5),
-    background = Color(0xFF10131A),
-    surface = Color(0xFF1B1F27),
-    surfaceVariant = Color(0xFF2A2F3A),
+    primaryContainer = Color(0xFF1E3A5F),
+    onPrimaryContainer = Color(0xFFD7E6FF),
+    secondary = Color(0xFF9AA8BF), // muted slate
+    onSecondary = Color(0xFF1B2333),
+    secondaryContainer = Color(0xFF2A3446),
+    onSecondaryContainer = Color(0xFFD3D9E3),
+    tertiary = GoldAccentDark, // warm gold accent -- used sparingly
+    onTertiary = Color(0xFF2E2000),
+    tertiaryContainer = Color(0xFF4A3A12),
+    onTertiaryContainer = Color(0xFFF6E3B4),
+    background = Color(0xFF0E131F),
+    onBackground = Color(0xFFE7EAF0),
+    surface = Color(0xFF182034),
+    onSurface = Color(0xFFE7EAF0),
+    surfaceVariant = Color(0xFF232C40),
+    onSurfaceVariant = Color(0xFFB7BFCE),
+    outline = Color(0xFF7C8494),
 )
 
 private val CeiShapes = Shapes(
@@ -46,11 +83,43 @@ private val CeiShapes = Shapes(
     extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(32.dp),
 )
 
+/**
+ * Display font for headings only -- bundled from `res/font/` (Poppins, SIL
+ * OFL 1.1; see `app/src/main/font-licenses/Poppins-OFL.txt` and the README
+ * acknowledgements). Body and label styles intentionally stay on the
+ * platform default for legibility.
+ */
+private val DisplayFontFamily = FontFamily(
+    Font(R.font.poppins_medium, FontWeight.Medium),
+    Font(R.font.poppins_semibold, FontWeight.SemiBold),
+    Font(R.font.poppins_bold, FontWeight.Bold),
+)
+
 private val CeiTypography = Typography(
-    headlineLarge = TextStyle(fontWeight = FontWeight.Bold, fontSize = 32.sp, lineHeight = 38.sp),
-    headlineMedium = TextStyle(fontWeight = FontWeight.Bold, fontSize = 26.sp, lineHeight = 32.sp),
-    titleLarge = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 26.sp),
-    titleMedium = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 22.sp),
+    headlineLarge = TextStyle(
+        fontFamily = DisplayFontFamily,
+        fontWeight = FontWeight.Bold,
+        fontSize = 32.sp,
+        lineHeight = 38.sp,
+    ),
+    headlineMedium = TextStyle(
+        fontFamily = DisplayFontFamily,
+        fontWeight = FontWeight.Bold,
+        fontSize = 26.sp,
+        lineHeight = 32.sp,
+    ),
+    titleLarge = TextStyle(
+        fontFamily = DisplayFontFamily,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 20.sp,
+        lineHeight = 26.sp,
+    ),
+    titleMedium = TextStyle(
+        fontFamily = DisplayFontFamily,
+        fontWeight = FontWeight.Medium,
+        fontSize = 16.sp,
+        lineHeight = 22.sp,
+    ),
     bodyLarge = TextStyle(fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 22.sp),
     bodyMedium = TextStyle(fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp),
     labelLarge = TextStyle(fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 18.sp),
@@ -59,7 +128,10 @@ private val CeiTypography = Typography(
 @Composable
 fun CeiTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    // Dynamic (wallpaper-derived) color is intentionally off: the brand's
+    // navy + gold "secure document" identity should always show, not a
+    // per-device Material You palette.
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current

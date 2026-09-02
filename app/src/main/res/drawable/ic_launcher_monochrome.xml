@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Themed-icon (Android 13+ monochrome) layer. This is drawn by the system
+  with a single, user-chosen tint, so it must not rely on color to separate
+  shapes, only on fill/stroke *alpha* and negative space. It intentionally
+  does NOT reuse @drawable/ic_launcher_foreground (that drawable is full
+  color and, once flattened to one tint, reads as a featureless blob).
+
+  Silhouette: an outlined (not filled) ID card, a solid photo box "punch",
+  and two NFC broadcast arcs, each a distinct path with clear gaps between
+  them so a single tint still reads as "ID card plus NFC" rather than a
+  blob. Drawn on the standard 108x108dp adaptive canvas, kept inside the
+  ~66dp safe zone (21..87) so it survives circle/squircle/rounded-square
+  masking.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- ID card outline (stroked, not filled) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="4"
+        android:strokeAlpha="1.0"
+        android:pathData="M35,40 L73,40 Q79,40 79,46 L79,68 Q79,74 73,74 L35,74 Q29,74 29,68 L29,46 Q29,40 35,40 Z" />
+
+    <!-- Photo placeholder "punch": solid fill, offset from the outline so it reads as a separate shape -->
+    <path
+        android:fillColor="#FF000000"
+        android:fillAlpha="0.9"
+        android:pathData="M36,47 L46,47 Q49,47 49,50 L49,61 Q49,64 46,64 L36,64 Q33,64 33,61 L33,50 Q33,47 36,47 Z" />
+
+    <!-- NFC broadcast arcs, radiating outward from the card's top-right corner -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:strokeAlpha="0.85"
+        android:pathData="M79,34 A5,5 0 0 1 84,39" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:strokeAlpha="0.5"
+        android:pathData="M79,28 A11,11 0 0 1 90,39" />
+
+</vector>

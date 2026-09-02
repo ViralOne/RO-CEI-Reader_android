@@ -11,6 +11,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -63,15 +64,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ceireader.app.BuildConfig
 import dev.ceireader.app.model.AddressPeriod
@@ -266,14 +274,15 @@ private fun IdleScreen(vm: ReadViewModel) {
                             Icon(
                                 imageVector = Icons.Filled.Nfc,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.secondary,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp),
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
                                 text = "Pregătit. Apropiați cardul de spatele telefonului.",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.secondary,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.primary,
                                 textAlign = TextAlign.Center,
                             )
                         }
@@ -285,8 +294,8 @@ private fun IdleScreen(vm: ReadViewModel) {
 
             Text(
                 text = "v${BuildConfig.VERSION_NAME}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center,
             )
         }
@@ -329,23 +338,27 @@ private fun ReadingScreen() {
             modifier = Modifier.padding(horizontal = 32.dp),
         ) {
             Box(contentAlignment = Alignment.Center) {
+                // The gold accent is reserved for exactly this moment -- the
+                // one place where the app is actively broadcasting/reading --
+                // so it reads as a deliberate signal, not decoration.
                 CircularProgressIndicator(
                     modifier = Modifier.size(140.dp),
                     strokeWidth = 4.dp,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    trackColor = MaterialTheme.colorScheme.tertiaryContainer,
                 )
                 Box(
                     modifier = Modifier
                         .size(88.dp)
                         .scale(scale)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
+                        .background(MaterialTheme.colorScheme.tertiaryContainer),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Nfc,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
                         modifier = Modifier.size(44.dp),
                     )
                 }
@@ -431,44 +444,50 @@ private fun ResultScreen(data: CeiData, onReset: () -> Unit) {
 
         Spacer(Modifier.height(16.dp))
 
+        val fullName = listOfNotNull(data.firstName, data.lastName).joinToString(" ")
         Text(
-            text = listOfNotNull(data.firstName, data.lastName).joinToString(" ").ifBlank { "Titular necunoscut" },
+            text = fullName.ifBlank { "Titular necunoscut" },
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
+            modifier = if (fullName.isNotBlank()) {
+                Modifier.copyOnLongPress(fullName, snackbarHostState)
+            } else {
+                Modifier
+            },
         )
 
         Spacer(Modifier.height(24.dp))
 
         SectionCard(title = "Identitate") {
-            InfoRow("CNP", data.cnp)
-            InfoRow("Sex", data.gender)
-            InfoRow("Cetățenie", data.citizenship)
+            InfoRow("CNP", data.cnp, snackbarHostState, monospace = true)
+            InfoRow("Sex", data.gender, snackbarHostState)
+            InfoRow("Cetățenie", data.citizenship, snackbarHostState)
         }
 
         SectionCard(title = "Naștere") {
-            InfoRow("Data nașterii", data.birthDate)
-            InfoRow("Locul nașterii", data.placeOfBirth)
+            InfoRow("Data nașterii", data.birthDate, snackbarHostState)
+            InfoRow("Locul nașterii", data.placeOfBirth, snackbarHostState)
         }
 
         SectionCard(title = "Document") {
-            InfoRow("Serie și număr", data.documentSerialNo)
-            InfoRow("Autoritate emitentă", data.issuingAuthority)
-            InfoRow("Data emiterii", data.issuingDate)
-            InfoRow("Data expirării", data.expiryDate)
+            InfoRow("Serie și număr", data.documentSerialNo, snackbarHostState, monospace = true)
+            InfoRow("Autoritate emitentă", data.issuingAuthority, snackbarHostState)
+            InfoRow("Data emiterii", data.issuingDate, snackbarHostState)
+            InfoRow("Data expirării", data.expiryDate, snackbarHostState)
         }
 
         SectionCard(title = "Adresă") {
-            InfoRow("Domiciliu", data.currentAddress)
+            InfoRow("Domiciliu", data.currentAddress, snackbarHostState)
             if (data.temporaryAddresses.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 Text("Reședințe temporare", style = MaterialTheme.typography.labelLarge)
-                data.temporaryAddresses.forEach { AddressPeriodRow(it) }
+                data.temporaryAddresses.forEach { AddressPeriodRow(it, snackbarHostState) }
             }
             if (data.foreignAddresses.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 Text("Adrese în străinătate", style = MaterialTheme.typography.labelLarge)
-                data.foreignAddresses.forEach { AddressPeriodRow(it) }
+                data.foreignAddresses.forEach { AddressPeriodRow(it, snackbarHostState) }
             }
         }
 
@@ -533,19 +552,27 @@ private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Un
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
+            // Small-caps-style gold label: the accent is deliberate here (a
+            // section header) rather than spread across the whole card.
             Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.primary,
+                text = title.uppercase(java.util.Locale.ROOT),
+                style = MaterialTheme.typography.labelLarge.copy(letterSpacing = 1.4.sp),
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.tertiary,
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
             content()
         }
     }
 }
 
 @Composable
-private fun InfoRow(label: String, value: String?) {
+private fun InfoRow(
+    label: String,
+    value: String?,
+    snackbarHostState: SnackbarHostState,
+    monospace: Boolean = false,
+) {
     // A null/blank value means the EF didn't carry this field -- render nothing rather
     // than a labeled row with a "—" placeholder.
     if (value.isNullOrBlank()) return
@@ -564,21 +591,56 @@ private fun InfoRow(label: String, value: String?) {
         Text(
             text = value,
             style = MaterialTheme.typography.bodyLarge,
+            fontFamily = if (monospace) FontFamily.Monospace else null,
             fontWeight = FontWeight.Medium,
+            modifier = Modifier.copyOnLongPress(value, snackbarHostState),
         )
     }
 }
 
 @Composable
-private fun AddressPeriodRow(period: AddressPeriod) {
+private fun AddressPeriodRow(
+    period: AddressPeriod,
+    snackbarHostState: SnackbarHostState,
+) {
     Column(modifier = Modifier.padding(vertical = 4.dp)) {
-        Text(period.address, style = MaterialTheme.typography.bodyLarge)
+        Text(
+            text = period.address,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.copyOnLongPress(period.address, snackbarHostState),
+        )
         Text(
             text = "${period.startDate ?: "?"} – ${period.endDate ?: "prezent"}",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
+
+/**
+ * Makes any [Text] (or other composable) long-press-copyable: a long press
+ * copies [text] to the clipboard and shows a brief confirmation on
+ * [snackbarHostState]. There is deliberately no `onClick` -- these values
+ * aren't otherwise interactive, so a tap adds neither a ripple nor a
+ * phantom action. [androidx.compose.ui.semantics.onLongClick] announces the
+ * long-press affordance to TalkBack as a named accessibility action
+ * ("Copiază") without overriding or duplicating the value's own text, so
+ * the value is announced once and the copy action is offered alongside it.
+ */
+@Composable
+private fun Modifier.copyOnLongPress(
+    text: String,
+    snackbarHostState: SnackbarHostState,
+): Modifier {
+    val clipboardManager = LocalClipboardManager.current
+    val scope = rememberCoroutineScope()
+    val copy: () -> Unit = {
+        clipboardManager.setText(AnnotatedString(text))
+        scope.launch { snackbarHostState.showSnackbar("Copiat în clipboard") }
+    }
+    return this
+        .pointerInput(text) { detectTapGestures(onLongPress = { copy() }) }
+        .semantics { onLongClick(label = "Copiază") { copy(); true } }
 }
 
 // ---------------------------------------------------------------------------
