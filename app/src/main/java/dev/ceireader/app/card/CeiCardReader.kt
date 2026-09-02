@@ -28,12 +28,20 @@ class CeiCardReader {
      * on failure. Intended to run on [Dispatchers.IO]; card resources opened
      * during the read are always closed before the flow completes.
      *
-     * [includePhoto] (default `false`) picks one of two flows:
-     * - `false` (fast path): skips [PaceSession] entirely -- no ICAO PACE,
-     *   no DG2 read -- and goes straight to the national applet (SELECT +
-     *   PACE#2 + PIN + the six text EFs), producing [CeiData] with
-     *   `faceImage = null`. This removes one full PACE handshake and the
-     *   DG2 round trips.
+     * The initial ICAO PACE(CAN) handshake (via [PaceSession.open]) ALWAYS
+     * runs first, regardless of [includePhoto]: on real hardware the national
+     * applet's SELECT cannot be the very first command sent to a freshly
+     * connected tag -- the card rejects it -- so PACE#1 must establish the
+     * secure-channel context before anything else touches the card. This
+     * ordering is hardware-verified (device CPH2581).
+     *
+     * [includePhoto] (default `false`) then picks whether the (slow) DG2
+     * photo file is read on top of that established context:
+     * - `false` (fast path): skips only the DG2 read -- PACE#1 still runs,
+     *   opened at normal length -- then proceeds straight to the national
+     *   applet (SELECT + PACE#2 + PIN + the six text EFs), producing
+     *   [CeiData] with `faceImage = null`. This removes just the DG2 round
+     *   trips (the expensive part), not the PACE handshake.
      * - `true` (full path): the original flow (PACE#1 -> DG2 -> national
      *   applet -> PACE#2 -> PIN -> EFs), using extended-length APDUs for the
      *   DG2 read when the tag supports them (see [PaceSession.open]).
@@ -42,15 +50,18 @@ class CeiCardReader {
         emit(ReadState.Started)
         var paceSession: PaceSession? = null
         try {
+            // Photo only benefits from extended-length APDUs (fewer DG2 round
+            // trips); fast mode has no large file to read, so it always opens
+            // at normal length.
+            val extendedSupported = includePhoto && isoDep.isExtendedLengthApduSupported()
+            var session = PaceSession(isoDep)
+            paceSession = session
+            var passportService = session.open(can, extendedSupported)
+
             var photo: ByteArray? = null
 
             if (includePhoto) {
-                val extendedSupported = isoDep.isExtendedLengthApduSupported()
-                var session = PaceSession(isoDep)
-                paceSession = session
-
                 photo = try {
-                    val passportService = session.open(can, extendedSupported)
                     val bytes = session.readFacePhoto(passportService)
                     Log.d(TAG, "DG2 read succeeded (extended=$extendedSupported)")
                     bytes
@@ -79,7 +90,7 @@ class CeiCardReader {
                     session.close()
                     session = PaceSession(isoDep)
                     paceSession = session
-                    val passportService = session.open(can, false)
+                    passportService = session.open(can, false)
                     val bytes = session.readFacePhoto(passportService)
                     Log.d(TAG, "DG2 read succeeded on normal-length retry")
                     bytes
@@ -121,8 +132,10 @@ class CeiCardReader {
 
             emit(ReadState.Finished(data))
         } finally {
-            // Only PaceSession needs explicit cleanup (and only when the full,
-            // includePhoto=true path ran it at all): NationalApplet's
+            // Only PaceSession needs explicit cleanup: PaceSession.open now
+            // ALWAYS runs (PACE#1 establishes the ICAO context before the
+            // national applet's SELECT, regardless of includePhoto), so this
+            // teardown always applies. NationalApplet's
             // IsoDepCardService.open() is a no-op over an already-connected
             // isoDep (see NationalApplet kdoc), and the tag connection itself is
             // owned by the caller (NfcReaderController). PaceSession.close() (not
