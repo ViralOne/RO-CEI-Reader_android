@@ -10,7 +10,9 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -63,9 +65,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.ClipboardManager
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -84,6 +91,7 @@ import dev.ceireader.app.model.ReadState
 import dev.ceireader.app.model.Validation
 import dev.ceireader.app.pdf.CeiPdfExporter
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -388,6 +396,7 @@ private fun ResultScreen(data: CeiData, onReset: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val clipboardManager = LocalClipboardManager.current
     var isExporting by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -438,44 +447,50 @@ private fun ResultScreen(data: CeiData, onReset: () -> Unit) {
 
         Spacer(Modifier.height(16.dp))
 
+        val fullName = listOfNotNull(data.firstName, data.lastName).joinToString(" ")
         Text(
-            text = listOfNotNull(data.firstName, data.lastName).joinToString(" ").ifBlank { "Titular necunoscut" },
+            text = fullName.ifBlank { "Titular necunoscut" },
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
+            modifier = if (fullName.isNotBlank()) {
+                Modifier.copyOnLongPress(fullName, clipboardManager, scope, snackbarHostState)
+            } else {
+                Modifier
+            },
         )
 
         Spacer(Modifier.height(24.dp))
 
         SectionCard(title = "Identitate") {
-            InfoRow("CNP", data.cnp, monospace = true)
-            InfoRow("Sex", data.gender)
-            InfoRow("Cetățenie", data.citizenship)
+            InfoRow("CNP", data.cnp, clipboardManager, scope, snackbarHostState, monospace = true)
+            InfoRow("Sex", data.gender, clipboardManager, scope, snackbarHostState)
+            InfoRow("Cetățenie", data.citizenship, clipboardManager, scope, snackbarHostState)
         }
 
         SectionCard(title = "Naștere") {
-            InfoRow("Data nașterii", data.birthDate)
-            InfoRow("Locul nașterii", data.placeOfBirth)
+            InfoRow("Data nașterii", data.birthDate, clipboardManager, scope, snackbarHostState)
+            InfoRow("Locul nașterii", data.placeOfBirth, clipboardManager, scope, snackbarHostState)
         }
 
         SectionCard(title = "Document") {
-            InfoRow("Serie și număr", data.documentSerialNo, monospace = true)
-            InfoRow("Autoritate emitentă", data.issuingAuthority)
-            InfoRow("Data emiterii", data.issuingDate)
-            InfoRow("Data expirării", data.expiryDate)
+            InfoRow("Serie și număr", data.documentSerialNo, clipboardManager, scope, snackbarHostState, monospace = true)
+            InfoRow("Autoritate emitentă", data.issuingAuthority, clipboardManager, scope, snackbarHostState)
+            InfoRow("Data emiterii", data.issuingDate, clipboardManager, scope, snackbarHostState)
+            InfoRow("Data expirării", data.expiryDate, clipboardManager, scope, snackbarHostState)
         }
 
         SectionCard(title = "Adresă") {
-            InfoRow("Domiciliu", data.currentAddress)
+            InfoRow("Domiciliu", data.currentAddress, clipboardManager, scope, snackbarHostState)
             if (data.temporaryAddresses.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 Text("Reședințe temporare", style = MaterialTheme.typography.labelLarge)
-                data.temporaryAddresses.forEach { AddressPeriodRow(it) }
+                data.temporaryAddresses.forEach { AddressPeriodRow(it, clipboardManager, scope, snackbarHostState) }
             }
             if (data.foreignAddresses.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 Text("Adrese în străinătate", style = MaterialTheme.typography.labelLarge)
-                data.foreignAddresses.forEach { AddressPeriodRow(it) }
+                data.foreignAddresses.forEach { AddressPeriodRow(it, clipboardManager, scope, snackbarHostState) }
             }
         }
 
@@ -555,7 +570,14 @@ private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Un
 }
 
 @Composable
-private fun InfoRow(label: String, value: String?, monospace: Boolean = false) {
+private fun InfoRow(
+    label: String,
+    value: String?,
+    clipboardManager: ClipboardManager,
+    scope: CoroutineScope,
+    snackbarHostState: SnackbarHostState,
+    monospace: Boolean = false,
+) {
     // A null/blank value means the EF didn't carry this field -- render nothing rather
     // than a labeled row with a "—" placeholder.
     if (value.isNullOrBlank()) return
@@ -576,14 +598,24 @@ private fun InfoRow(label: String, value: String?, monospace: Boolean = false) {
             style = MaterialTheme.typography.bodyLarge,
             fontFamily = if (monospace) FontFamily.Monospace else null,
             fontWeight = FontWeight.Medium,
+            modifier = Modifier.copyOnLongPress(value, clipboardManager, scope, snackbarHostState),
         )
     }
 }
 
 @Composable
-private fun AddressPeriodRow(period: AddressPeriod) {
+private fun AddressPeriodRow(
+    period: AddressPeriod,
+    clipboardManager: ClipboardManager,
+    scope: CoroutineScope,
+    snackbarHostState: SnackbarHostState,
+) {
     Column(modifier = Modifier.padding(vertical = 4.dp)) {
-        Text(period.address, style = MaterialTheme.typography.bodyLarge)
+        Text(
+            text = period.address,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.copyOnLongPress(period.address, clipboardManager, scope, snackbarHostState),
+        )
         Text(
             text = "${period.startDate ?: "?"} – ${period.endDate ?: "prezent"}",
             style = MaterialTheme.typography.bodyMedium,
@@ -591,6 +623,32 @@ private fun AddressPeriodRow(period: AddressPeriod) {
         )
     }
 }
+
+/**
+ * Makes any [Text] (or other composable) long-press-copyable: a long press
+ * copies [text] to the clipboard and shows a brief confirmation on
+ * [snackbarHostState]. The plain tap ([onClick]) is a no-op -- these values
+ * aren't otherwise interactive -- so the long press is the entire
+ * affordance, kept deliberately subtle (no visual change) rather than adding
+ * chrome to every result-screen row. [contentDescription] carries the same
+ * hint to screen readers without hiding the value itself from TalkBack.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+private fun Modifier.copyOnLongPress(
+    text: String,
+    clipboardManager: ClipboardManager,
+    scope: CoroutineScope,
+    snackbarHostState: SnackbarHostState,
+): Modifier = this
+    .combinedClickable(
+        onClick = {},
+        onLongClickLabel = "Copiază în clipboard",
+        onLongClick = {
+            clipboardManager.setText(AnnotatedString(text))
+            scope.launch { snackbarHostState.showSnackbar("Copiat în clipboard") }
+        },
+    )
+    .semantics { contentDescription = "$text. Țineți apăsat pentru a copia" }
 
 // ---------------------------------------------------------------------------
 // Error screen
