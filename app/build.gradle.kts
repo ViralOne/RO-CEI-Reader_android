@@ -34,7 +34,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("org.jmrtd:jmrtd:0.8.8")
     implementation("net.sf.scuba:scuba-sc-android:0.0.27")
-    implementation("org.bouncycastle:bcprov-jdk18on:1.85")
-    implementation("org.bouncycastle:bcutil-jdk18on:1.85")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.86")
+    implementation("org.bouncycastle:bcutil-jdk18on:1.86")
     testImplementation("junit:junit:4.13.2")
 }
