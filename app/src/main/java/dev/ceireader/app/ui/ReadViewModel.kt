@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import dev.ceireader.app.card.CeiCardReader
 import dev.ceireader.app.model.NfcStatus
 import dev.ceireader.app.model.ReadState
+import dev.ceireader.app.model.Validation
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +33,20 @@ class ReadViewModel : ViewModel() {
 
     /** "Include fotografia" switch on the entry screen; OFF by default (fast, text-only read). */
     var includePhoto by mutableStateOf(false)
+
+    /**
+     * Whether the typed [can]/[pin] are complete enough to attempt a read at all
+     * (6 and 4 digits respectively -- the entry screen already restricts both
+     * fields to digits).
+     *
+     * [onTag] refuses to start a read unless this holds: PACE derives its key
+     * from the CAN, so tapping a card with a blank or half-typed CAN makes the
+     * card reject the handshake with SW 0x6300 at step 4, which [CeiCardReader.mapError]
+     * reports as a generic communication error. Not starting at all is both
+     * faster and far less misleading than letting the card refuse us.
+     */
+    val credentialsReady: Boolean
+        get() = Validation.isValidCan(can) && Validation.isValidPin(pin)
 
     /**
      * Reflects [dev.ceireader.app.nfc.NfcReaderController.status]; kept in sync by
@@ -60,6 +75,7 @@ class ReadViewModel : ViewModel() {
      */
     fun onTag(isoDep: IsoDep) {
         if (_state.value != ReadState.Idle) return // results/error on screen (or read in flight); ignore the tap.
+        if (!credentialsReady) return // no/partial CAN or PIN typed yet; never touch the card (see [credentialsReady]).
         if (!isProcessing.compareAndSet(false, true)) return // a read is already in progress; ignore.
         viewModelScope.launch {
             try {
