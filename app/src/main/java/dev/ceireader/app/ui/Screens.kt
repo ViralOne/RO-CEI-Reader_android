@@ -286,6 +286,17 @@ private fun IdleScreen(vm: ReadViewModel) {
                                 textAlign = TextAlign.Center,
                             )
                         }
+
+                        // NFC is available but the CAN/PIN aren't complete yet, so
+                        // ReadViewModel.onTag will ignore any tap. Say so, otherwise
+                        // tapping the card here looks like the app simply does nothing.
+                        else -> Text(
+                            text = "Introduceți CAN și PIN pentru a putea citi cardul.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 }
             }

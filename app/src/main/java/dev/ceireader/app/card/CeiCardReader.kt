@@ -145,7 +145,15 @@ class CeiCardReader {
             // must still tear down the card connection it partially opened.
             paceSession?.close()
         }
-    }.catch { emit(mapError(it)) }.flowOn(Dispatchers.IO)
+    }.catch {
+        // [mapError] collapses every failure into one of a handful of user-facing
+        // strings, so without this the real cause never reaches logcat and a
+        // protocol-level rejection is indistinguishable from a dependency
+        // regression. Logs the exception class/message and stack only -- JMRTD and
+        // scuba report SW codes and protocol step numbers here, never card data.
+        Log.w(TAG, "read failed", it)
+        emit(mapError(it))
+    }.flowOn(Dispatchers.IO)
 
     /**
      * Pure mapping from a raw exception thrown during [read] to a
